@@ -33,6 +33,7 @@ return new class extends Migration
             $table->text('company_image')->nullable();
 
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

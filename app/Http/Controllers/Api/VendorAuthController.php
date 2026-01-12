@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorAddress;
 use App\Models\VendorDocument;
+use App\Models\OtpLog;
 
 class VendorAuthController extends Controller
 {
@@ -89,6 +90,8 @@ class VendorAuthController extends Controller
 
         try {
 
+            $otp = 1234;
+
             $user = User::create([
                 'role' => $request->role,
                 'first_name' => $request->first_name,
@@ -100,6 +103,21 @@ class VendorAuthController extends Controller
                 'password' => Hash::make($request->password),
                 'sample_pass' => $request->password,
                 'status' => 1,
+
+                'otp_code'       => $otp,
+                'otp_sent_at'    => now(),
+                'otp_expires_at' => now()->addMinutes(5),
+            ]);
+
+            OtpLog::create([
+                'user_id'        => $user->id,
+                'identifier'     => $user->primary_mobile,
+                'channel'        => 'sms',
+                'otp_code'       => $otp,
+                'purpose'        => 'signup',
+                'status'         => 'sent',
+                'ip_address'     => $request->ip(),
+                'sent_at'        => now(),
             ]);
 
             $vendor = Vendor::create([
@@ -171,11 +189,14 @@ class VendorAuthController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => 'User created successfully',
+                'message' => 'Signup successful. OTP sent to registered mobile number.',
                 'data' => [
-                    'user_id' => $user->id
+                    'user_id' => $user->id,
+                    'primary_mobile' => $user->primary_mobile,
+                    'otp_expires_in' => 300
                 ]
             ], 201);
+
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -219,13 +240,23 @@ class VendorAuthController extends Controller
                 ], 400);
             }
 
-            // $otp = rand(1000, 9999);
             $otp = 1234;
 
             $user->update([
                 'otp_code'       => $otp,
                 'otp_expires_at' => now()->addMinutes(5),
                 'otp_sent_at'    => now(),
+            ]);
+
+            OtpLog::create([
+                'user_id'        => $user->id,
+                'identifier'     => $user->primary_mobile,
+                'channel'        => 'sms',
+                'otp_code'       => $otp,
+                'purpose'        => 'signup',
+                'status'         => 'sent',
+                'ip_address'     => $request->ip(),
+                'sent_at'        => now(),
             ]);
 
             return response()->json([
@@ -245,7 +276,6 @@ class VendorAuthController extends Controller
 
     public function resendOtp(Request $request)
     {
-
         try {
 
             $validator = Validator::make($request->all(), [
@@ -261,7 +291,6 @@ class VendorAuthController extends Controller
             }
 
             $user = User::where('primary_mobile', $request->primary_mobile)->first();
-            // dd($user);
 
             if (!$user) {
                 return response()->json([
@@ -278,13 +307,23 @@ class VendorAuthController extends Controller
                 ], 429);
             }
 
-            // $otp = rand(1000, 9999);
             $otp = 1234;
 
             $user->update([
                 'otp_code'       => $otp,
                 'otp_sent_at'    => now(),
                 'otp_expires_at' => now()->addMinutes(5),
+            ]);
+
+            OtpLog::create([
+                'user_id'        =>  $user->id,
+                'identifier'     =>  $user->primary_mobile,
+                'channel'        =>  'sms',
+                'otp_code'       =>  $otp,
+                'purpose'        =>  'signup_resend',
+                'status'         =>  'sent',
+                'ip_address'     =>  $request->ip(),
+                'sent_at'        =>  now(),
             ]);
 
             return response()->json([
@@ -356,6 +395,16 @@ class VendorAuthController extends Controller
                 ], 401);
             }
 
+            OtpLog::where('user_id', $user->id)->where('otp_code', $request->otp)
+            ->whereIn('purpose', ['signup', 'signup_resend'])
+            ->where('status', 'sent')
+            ->orderByDesc('id')
+            ->first()
+            ?->update([
+                'status'      => 'verified',
+                'verified_at' => now(),
+            ]);
+
             $user->update([
                 'primary_mobile_verified_at' => Carbon::now(),
                 'otp_code'        => null,
@@ -380,4 +429,468 @@ class VendorAuthController extends Controller
             ], 500);
         }
     }
+
+    public function forgotPasswordSendOtp(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'username' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid input',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $username = $request->username;
+
+            $isMobile = preg_match('/^[0-9]{10}$/', $username);
+            $isEmail  = filter_var($username, FILTER_VALIDATE_EMAIL);
+
+            if (!$isMobile && !$isEmail) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Enter valid mobile number or email address'
+                ], 422);
+            }
+
+            $user = User::where(
+                $isMobile ? 'primary_mobile' : 'primary_email',
+                $username
+            )->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Account not found'
+                ], 404);
+            }
+
+            if ($user->otp_sent_at && Carbon::parse($user->otp_sent_at)->addSeconds(60)->isFuture()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Please wait before requesting another OTP'
+                ], 429);
+            }
+
+            $otp =  1234;
+
+            $user->update([
+                'otp_code'       => $otp,
+                'otp_sent_at'    => now(),
+                'otp_expires_at' => now()->addMinutes(5),
+            ]);
+
+            OtpLog::where('identifier', $username)
+            ->whereIn('purpose', ['forgot_password', 'forgot_password_resend'])
+            ->where('status', 'sent')
+            ->update(['status' => 'expired']);
+
+            OtpLog::create([
+                'user_id'    => $user->id,
+                'identifier' => $username,
+                'channel'    => $isMobile ? 'sms' : 'email',
+                'otp_code'   => $otp,
+                'purpose'    => 'forgot_password',
+                'status'     => 'sent',
+                'ip_address' => $request->ip(),
+                'sent_at'    => now(),
+            ]);
+
+
+            if ($isMobile) {
+
+            } else {
+
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => $isMobile
+                    ? 'OTP sent to registered mobile number'
+                    : 'OTP sent to registered email address',
+                'expires_in' => 300
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function forgotPasswordResendOtp(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'username' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Invalid input',
+                    'errors'  => $validator->errors(),
+                ], 422);
+            }
+
+            $username = $request->username;
+
+            $isMobile = preg_match('/^[0-9]{10}$/', $username);
+            $isEmail  = filter_var($username, FILTER_VALIDATE_EMAIL);
+
+            if (!$isMobile && !$isEmail) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Enter valid mobile number or email address',
+                ], 422);
+            }
+
+            $user = User::where(
+                $isMobile ? 'primary_mobile' : 'primary_email',
+                $username
+            )->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Account not found',
+                ], 404);
+            }
+
+            if ($user->otp_sent_at && Carbon::parse($user->otp_sent_at)->addSeconds(60)->isFuture()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Please wait before requesting another OTP',
+                ], 429);
+            }
+
+            $otp =  1234;
+
+            $user->update([
+                'otp_code'       => $otp,
+                'otp_sent_at'    => now(),
+                'otp_expires_at' => now()->addMinutes(5),
+            ]);
+
+            OtpLog::where('identifier', $username)
+                ->whereIn('purpose', ['forgot_password', 'forgot_password_resend'])
+                ->where('status', 'sent')
+                ->update(['status' => 'expired']);
+
+            OtpLog::create([
+                'user_id'    => $user->id,
+                'identifier' => $username,
+                'channel'    => $isMobile ? 'sms' : 'email',
+                'otp_code'   => $otp,
+                'purpose'    => 'forgot_password_resend',
+                'status'     => 'sent',
+                'ip_address' => $request->ip(),
+                'sent_at'    => now(),
+            ]);
+
+
+            if ($isMobile) {
+
+            } else {
+
+            }
+
+            return response()->json([
+                'status'  => true,
+                'message' => $isMobile
+                    ? 'OTP resent to registered mobile number'
+                    : 'OTP resent to registered email address',
+                'expires_in' => 300,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
+    public function forgotPasswordVerifyOtp(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'username' => 'required|string',
+                'otp'      => 'required|digits:4',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Validation error',
+                    'errors'  => $validator->errors(),
+                ], 422);
+            }
+
+            $username = $request->username;
+
+            $isMobile = preg_match('/^[0-9]{10}$/', $username);
+            $isEmail  = filter_var($username, FILTER_VALIDATE_EMAIL);
+
+            if (!$isMobile && !$isEmail) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Enter valid mobile number or email address',
+                ], 422);
+            }
+
+            $user = User::where(
+                $isMobile ? 'primary_mobile' : 'primary_email',
+                $username
+            )->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Account not found',
+                ], 404);
+            }
+
+            if (!$user->otp_code || !$user->otp_expires_at) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'OTP not generated. Please request OTP again.',
+                ], 400);
+            }
+
+            if (Carbon::now()->greaterThan(Carbon::parse($user->otp_expires_at))) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'OTP has expired. Please request a new OTP.',
+                ], 410);
+            }
+
+            if ($user->otp_code !== $request->otp) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Invalid OTP',
+                ], 401);
+            }
+
+            OtpLog::where('user_id', $user->id)
+                ->where('identifier', $username)
+                ->where('otp_code', $request->otp)
+                ->whereIn('purpose', ['forgot_password', 'forgot_password_resend'])
+                ->where('status', 'sent')
+                ->orderByDesc('id')
+                ->first()
+                ?->update([
+                    'status'      => 'verified',
+                    'verified_at' => now(),
+                ]);
+
+            $user->update([
+                'otp_code'       => null,
+                'otp_expires_at' => null,
+                'otp_sent_at'    => null,
+            ]);
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'OTP verified successfully. You can now reset your password.',
+                'data'    => [
+                    'user_id' => $user->id,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
+    public function forgotPasswordReset(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'username'         => 'required|string',
+                'password'         => 'required|string|min:6',
+                'confirm_password' => 'required|same:password',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Validation error',
+                    'errors'  => $validator->errors(),
+                ], 422);
+            }
+
+            $username = $request->username;
+
+            $isMobile = preg_match('/^[0-9]{10}$/', $username);
+            $isEmail  = filter_var($username, FILTER_VALIDATE_EMAIL);
+
+            if (!$isMobile && !$isEmail) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Enter valid mobile number or email address',
+                ], 422);
+            }
+
+            $user = User::where(
+                $isMobile ? 'primary_mobile' : 'primary_email',
+                $username
+            )->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'User not found',
+                ], 404);
+            }
+
+            $verifiedOtp = OtpLog::where('user_id', $user->id)
+                ->where('identifier', $username)
+                ->whereIn('purpose', ['forgot_password', 'forgot_password_resend'])
+                ->where('status', 'verified')
+                ->latest()
+                ->first();
+
+            if (!$verifiedOtp) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'OTP verification required before resetting password',
+                ], 403);
+            }
+
+            $user->update([
+                'password'    => Hash::make($request->password),
+                'sample_pass' => $request->password,
+            ]);
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Password updated successfully. You can now login.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function login(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'username' => 'required|string',
+                'password' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $username = $request->username;
+
+            $isMobile = preg_match('/^[0-9]{10}$/', $username);
+            $isEmail  = filter_var($username, FILTER_VALIDATE_EMAIL);
+
+            if (!$isMobile && !$isEmail) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Enter valid mobile number or email address',
+                ], 422);
+            }
+
+            $user = User::where(
+                $isMobile ? 'primary_mobile' : 'primary_email',
+                $username
+            )->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid credentials',
+                ], 401);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid credentials',
+                ], 401);
+            }
+
+            if (!$user->primary_mobile_verified_at) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Please verify your mobile number before login',
+                ], 403);
+            }
+
+            $token = $user->createToken('vendor-login')->plainTextToken;
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Login successful',
+                'data' => [
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                    'user' => [
+                        'id' => $user->id,
+                        'role' => $user->role,
+                        'first_name' => $user->first_name,
+                        'last_name' => $user->last_name,
+                        'primary_mobile' => $user->primary_mobile,
+                        'primary_email' => $user->primary_email,
+                    ]
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function logout(Request $request)
+    {
+        // dd('fd');
+        try {
+
+            $request->user()->currentAccessToken()->delete();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Logout successful',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }

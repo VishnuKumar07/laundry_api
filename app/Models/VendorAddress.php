@@ -4,11 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class VendorAddress extends Model
 {
-    use HasFactory;
-
+    use HasFactory, SoftDeletes;
     protected $table = 'vendor_addresses';
 
     protected $guarded = ['id'];

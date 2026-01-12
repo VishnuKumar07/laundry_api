@@ -3,6 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Auth\AuthenticationException;
+use App\Http\Middleware\ForceJsonResponse;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -11,9 +13,29 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+
+        $middleware->api(prepend: [
+            ForceJsonResponse::class,
+        ]);
+
     })
+
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
-    })->create();
+
+        $exceptions->render(function (AuthenticationException $e, $request) {
+
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'status'  => 401,
+                    'message' => $request->hasHeader('Authorization')
+                        ? 'Invalid or expired token'
+                        : 'Authorization token missing',
+                ], 401);
+            }
+        });
+
+    })
+
+    ->create();

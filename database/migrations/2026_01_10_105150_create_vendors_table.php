@@ -20,7 +20,10 @@ return new class extends Migration
             $table->date('date_of_birth')->nullable();
             $table->date('date_of_incorporation');
 
+            $table->enum('status', ['pending', 'active', 'rejected'])->default('pending');
+
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
