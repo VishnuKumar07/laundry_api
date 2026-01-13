@@ -208,7 +208,7 @@ class VendorAuthController extends Controller
         }
     }
 
-    public function sendOtp(Request $request)
+    public function signupSendOtp(Request $request)
     {
         try {
 
@@ -274,7 +274,7 @@ class VendorAuthController extends Controller
         }
     }
 
-    public function resendOtp(Request $request)
+    public function signupResendOtp(Request $request)
     {
         try {
 
@@ -341,7 +341,7 @@ class VendorAuthController extends Controller
         }
     }
 
-    public function verifyOtp(Request $request)
+    public function signupVerifyOtp(Request $request)
     {
         try {
 
@@ -872,9 +872,206 @@ class VendorAuthController extends Controller
         }
     }
 
+    private function sendLoginOtp(Request $request, string $purpose)
+    {
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid input',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $username = $request->username;
+
+        $isMobile = preg_match('/^[0-9]{10}$/', $username);
+        $isEmail  = filter_var($username, FILTER_VALIDATE_EMAIL);
+
+        if (!$isMobile && !$isEmail) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Enter valid mobile number or email address',
+            ], 422);
+        }
+
+        $user = User::where(
+            $isMobile ? 'primary_mobile' : 'primary_email',
+            $username
+        )->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Account not found',
+            ], 404);
+        }
+
+        if ($isMobile && !$user->primary_mobile_verified_at) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Please verify your mobile number before login',
+            ], 403);
+        }
+
+        if ($user->otp_sent_at && Carbon::parse($user->otp_sent_at)->addSeconds(60)->isFuture()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Please wait before requesting another OTP',
+            ], 429);
+        }
+
+        $otp = app()->environment('production') ? rand(1000, 9999) : 1234;
+
+        $user->update([
+            'otp_code'       => $otp,
+            'otp_sent_at'    => now(),
+            'otp_expires_at' => now()->addMinutes(5),
+        ]);
+
+        OtpLog::where('identifier', $username)
+            ->whereIn('purpose', ['login', 'login_resend'])
+            ->where('status', 'sent')
+            ->update(['status' => 'expired']);
+
+        OtpLog::create([
+            'user_id'    => $user->id,
+            'identifier' => $username,
+            'channel'    => $isMobile ? 'sms' : 'email',
+            'otp_code'   => $otp,
+            'purpose'    => $purpose,
+            'status'     => 'sent',
+            'ip_address' => $request->ip(),
+            'sent_at'    => now(),
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => $purpose == 'login'
+                ? 'Login OTP sent'
+                : 'Login OTP resent',
+            'expires_in' => 300,
+        ]);
+    }
+
+    public function loginSendOtp(Request $request)
+    {
+        return $this->sendLoginOtp($request, 'login');
+    }
+
+    public function loginResendOtp(Request $request)
+    {
+        return $this->sendLoginOtp($request, 'login_resend');
+    }
+
+    public function loginVerifyOtp(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'username' => 'required|string',
+                'otp'      => 'required|digits:4',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $username = $request->username;
+
+            $isMobile = preg_match('/^[0-9]{10}$/', $username);
+            $isEmail  = filter_var($username, FILTER_VALIDATE_EMAIL);
+
+            if (!$isMobile && !$isEmail) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Enter valid mobile number or email address',
+                ], 422);
+            }
+
+            $user = User::where(
+                $isMobile ? 'primary_mobile' : 'primary_email',
+                $username
+            )->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Account not found',
+                ], 404);
+            }
+
+            if (!$user->otp_code || !$user->otp_expires_at) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'OTP not generated',
+                ], 400);
+            }
+
+            if (now()->greaterThan($user->otp_expires_at)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'OTP expired',
+                ], 410);
+            }
+
+            if ($user->otp_code !== $request->otp) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid OTP',
+                ], 401);
+            }
+
+
+            OtpLog::where('user_id', $user->id)
+                ->where('identifier', $username)
+                ->where('otp_code', $request->otp)
+                ->whereIn('purpose', ['login', 'login_resend'])
+                ->where('status', 'sent')
+                ->latest()
+                ->first()
+                ?->update([
+                    'status' => 'verified',
+                    'verified_at' => now(),
+                ]);
+
+            $user->update([
+                'otp_code'       => null,
+                'otp_sent_at'    => null,
+                'otp_expires_at' => null,
+            ]);
+
+            $token = $user->createToken('vendor-login')->plainTextToken;
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Login successful',
+                'token' => $token,
+                'user' => [
+                    'id' => $user->id,
+                    'role' => $user->role,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function logout(Request $request)
     {
-        // dd('fd');
         try {
 
             $request->user()->currentAccessToken()->delete();
@@ -892,5 +1089,4 @@ class VendorAuthController extends Controller
             ], 500);
         }
     }
-
 }

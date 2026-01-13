@@ -24,6 +24,7 @@ return new class extends Migration
 
             $table->enum('purpose', [
                 'signup',
+                'signup_resend',
                 'login',
                 'login_resend',
                 'forgot_password',
