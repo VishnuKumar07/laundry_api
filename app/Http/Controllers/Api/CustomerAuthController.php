@@ -1,0 +1,393 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use App\Models\User;
+use App\Models\Customer;
+use App\Models\CustomerAddress;
+use App\Models\OtpLog;
+
+class CustomerAuthController extends Controller
+{
+    public function signup(Request $request)
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'role' => 'required|in:vendor,branch,customer',
+                'primary_mobile' => 'required|digits:10|unique:users,primary_mobile',
+                'secondary_mobile' => 'nullable|digits:10',
+                'primary_email' => 'nullable|email|unique:users,primary_email',
+                'secondary_email' => 'nullable|email',
+                'password' => 'required|string|min:6',
+                'confirm_password' => 'required|same:password',
+                'date_of_birth' => 'nullable|date',
+                'date_of_anniversary' => 'nullable|date',
+                'address_type' => 'required|in:office,home,others',
+                'pincode' => 'nullable|digits:6',
+                'house_image' => 'nullable|array|max:5',
+                'house_image.*' => 'image|mimes:jpg,jpeg,png|max:2048',
+            ],
+            [
+                'first_name.required' => 'First name is required',
+                'last_name.required' => 'Last name is required',
+                'role.required' => 'Role is required',
+                'role.in' => 'Role must be vendor, branch, or customer',
+                'primary_mobile.required' => 'Mobile number is required',
+                'primary_mobile.digits' => 'Mobile number must be exactly 10 digits',
+                'primary_mobile.unique' => 'Mobile number already exists',
+                'secondary_mobile.digits' => 'Secondary mobile number must be exactly 10 digits',
+                'primary_email.unique' => 'Email address already exists',
+                'secondary_email.email' => 'Please enter a valid secondary email address',
+                'password.required' => 'Password is required',
+                'password.min' => 'Password must be at least 6 characters',
+                'confirm_password.required' => 'Confirm password is required',
+                'confirm_password.same' => 'Password and confirm password do not match',
+                'date_of_birth.date' => 'Please enter a valid date of birth',
+                'date_of_anniversary.date' => 'Please enter a valid date of anniversary',
+                'address_type.required' => 'Address type is required',
+                'address_type.in' => 'Address type must be office, home or others',
+                'house_image.array' => 'House images must be an array',
+                'pincode.digits' => 'Pincode must be exactly 6 digits',
+                'house_image.max' => 'You can upload maximum 5 House images',
+                'house_image.*.image' => 'Each House image must be an image file',
+                'house_image.*.mimes' => 'House images must be JPG or PNG',
+                'house_image.*.max' => 'Each House image must not exceed 2MB',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try
+        {
+            $otp = 1234;
+
+            $user = User::create([
+                'role' => $request->role,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'primary_mobile' => $request->primary_mobile,
+                'secondary_mobile' => $request->secondary_mobile,
+                'primary_email' => $request->primary_email,
+                'secondary_email' => $request->secondary_email,
+                'password' => Hash::make($request->password),
+                'sample_pass' => $request->password,
+                'status' => 1,
+                'otp_code'       => $otp,
+                'otp_sent_at'    => now(),
+                'otp_expires_at' => now()->addMinutes(5),
+            ]);
+
+            OtpLog::create([
+                'user_id'        => $user->id,
+                'identifier'     => $user->primary_mobile,
+                'channel'        => 'sms',
+                'otp_code'       => $otp,
+                'purpose'        => 'signup',
+                'status'         => 'sent',
+                'ip_address'     => $request->ip(),
+                'sent_at'        => now(),
+            ]);
+
+            $customer = Customer::create([
+                'user_id' => $user->id,
+                'date_of_birth'        => $request->date_of_birth,
+                'date_of_anniversary'  => $request->date_of_anniversary ?? null,
+            ]);
+
+            $houseImagePaths = [];
+
+            if ($request->hasFile('house_image')) {
+                $images = $request->file('house_image');
+                $folder = 'uploads/customer/house_image';
+
+                if (!file_exists(public_path($folder))) {
+                    mkdir(public_path($folder), 0755, true);
+                }
+
+                foreach ($images as $image) {
+                    $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+                    $image->move(public_path($folder), $fileName);
+                    $houseImagePaths[] = $folder . '/' . $fileName;
+                }
+            }
+
+            $customerAddress = CustomerAddress::create([
+                'customer_id'     => $customer->id,
+                'door_no'       => $request->door_no ?? null,
+                'street'        => $request->street ?? null,
+                'landmark'      => $request->landmark ?? null,
+                'pincode'       => $request->pincode ?? null,
+                'city'          => $request->city ?? null,
+                'state'         => $request->state ?? null,
+                'country'       => $request->country ?? null,
+                'latitude'      => $request->latitude ?? null,
+                'longitude'     => $request->longitude ?? null,
+                'address_type'  => $request->address_type,
+                'house_image' => !empty($houseImagePaths) ? json_encode($houseImagePaths) : null
+
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Signup successful. OTP sent to registered mobile number.',
+                'data' => [
+                    'user_id' => $user->id,
+                    'primary_mobile' => $user->primary_mobile,
+                    'otp_expires_in' => 300
+                ]
+            ], 201);
+
+        }
+        catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+    }
+
+    public function signupSendOtp(Request $request)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'primary_mobile' => 'required|digits:10',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Invalid mobile number',
+                    'errors'  => $validator->errors()
+                ], 422);
+            }
+
+            $user = User::where('primary_mobile', $request->primary_mobile)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Mobile number not registered'
+                ], 404);
+            }
+
+            if ($user->primary_mobile_verified_at) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Mobile number already verified'
+                ], 400);
+            }
+
+            $otp = 1234;
+
+            $user->update([
+                'otp_code'       => $otp,
+                'otp_expires_at' => now()->addMinutes(5),
+                'otp_sent_at'    => now(),
+            ]);
+
+            OtpLog::create([
+                'user_id'        => $user->id,
+                'identifier'     => $user->primary_mobile,
+                'channel'        => 'sms',
+                'otp_code'       => $otp,
+                'purpose'        => 'signup',
+                'status'         => 'sent',
+                'ip_address'     => $request->ip(),
+                'sent_at'        => now(),
+            ]);
+
+            return response()->json([
+                'status'      => true,
+                'message'     => 'OTP sent successfully',
+                'expires_in'  => 300
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Something went wrong while sending OTP',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function signupResendOtp(Request $request)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'primary_mobile' => 'required|digits:10',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid mobile number',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $user = User::where('primary_mobile', $request->primary_mobile)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Mobile number not found'
+                ], 404);
+            }
+
+            if ($user->otp_sent_at && Carbon::parse($user->otp_sent_at)->addSeconds(60)->isFuture())
+            {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Please wait before requesting another OTP'
+                ], 429);
+            }
+
+            $otp = 1234;
+
+            $user->update([
+                'otp_code'       => $otp,
+                'otp_sent_at'    => now(),
+                'otp_expires_at' => now()->addMinutes(5),
+            ]);
+
+            OtpLog::create([
+                'user_id'        =>  $user->id,
+                'identifier'     =>  $user->primary_mobile,
+                'channel'        =>  'sms',
+                'otp_code'       =>  $otp,
+                'purpose'        =>  'signup_resend',
+                'status'         =>  'sent',
+                'ip_address'     =>  $request->ip(),
+                'sent_at'        =>  now(),
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'OTP resent successfully',
+                'expires_in' => 300
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function signupVerifyOtp(Request $request)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'primary_mobile' => 'required|digits:10',
+                'otp'            => 'required|digits:4',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Validation error',
+                    'errors'  => $validator->errors(),
+                ], 422);
+            }
+
+            $user = User::where('primary_mobile', $request->primary_mobile)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Mobile number not found',
+                ], 404);
+            }
+
+            if ($user->primary_mobile_verified_at) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Mobile number already verified',
+                ], 400);
+            }
+
+            if (!$user->otp_code || !$user->otp_expires_at) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'OTP not generated. Please request OTP again.',
+                ], 400);
+            }
+
+            if (Carbon::now()->greaterThan(Carbon::parse($user->otp_expires_at))) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'OTP has expired. Please request a new OTP.',
+                ], 410);
+            }
+
+            if ($user->otp_code !== $request->otp) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Invalid OTP',
+                ], 401);
+            }
+
+            OtpLog::where('user_id', $user->id)->where('otp_code', $request->otp)
+            ->whereIn('purpose', ['signup', 'signup_resend'])
+            ->where('status', 'sent')
+            ->orderByDesc('id')
+            ->first()
+            ?->update([
+                'status'      => 'verified',
+                'verified_at' => now(),
+            ]);
+
+            $user->update([
+                'primary_mobile_verified_at' => Carbon::now(),
+                'otp_code'        => null,
+                'otp_expires_at'  => null,
+                'otp_sent_at'     => null,
+            ]);
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Mobile number verified successfully',
+                'data'    => [
+                    'user_id' => $user->id,
+                    'role'    => $user->role,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+}

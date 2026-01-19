@@ -103,7 +103,6 @@ class VendorAuthController extends Controller
                 'password' => Hash::make($request->password),
                 'sample_pass' => $request->password,
                 'status' => 1,
-
                 'otp_code'       => $otp,
                 'otp_sent_at'    => now(),
                 'otp_expires_at' => now()->addMinutes(5),
@@ -715,7 +714,6 @@ class VendorAuthController extends Controller
         }
     }
 
-
     public function forgotPasswordReset(Request $request)
     {
         try {
@@ -924,7 +922,7 @@ class VendorAuthController extends Controller
             ], 429);
         }
 
-        $otp = app()->environment('production') ? rand(1000, 9999) : 1234;
+        $otp =  1234;
 
         $user->update([
             'otp_code'       => $otp,
