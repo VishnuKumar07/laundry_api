@@ -232,6 +232,14 @@ class VendorAuthController extends Controller
                 ], 404);
             }
 
+            if ($user->otp_sent_at && Carbon::parse($user->otp_sent_at)->addSeconds(60)->isFuture())
+            {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Please wait before requesting another OTP'
+                ], 429);
+            }
+
             if ($user->primary_mobile_verified_at) {
                 return response()->json([
                     'status'  => false,

@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\CustomerAuthController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\VendorAuthController;
+use App\Http\Controllers\Api\ServiceController;
+
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -22,10 +24,6 @@ Route::post('/vendor/login/send-otp', [VendorAuthController::class, 'loginSendOt
 Route::post('/vendor/login/resend-otp', [VendorAuthController::class, 'loginResendOtp']);
 Route::post('/vendor/login/verify-otp', [VendorAuthController::class, 'loginVerifyOtp']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
-});
-
 // Customer Signup
 Route::post('/customer/signup', [CustomerAuthController::class, 'signup']);
 Route::post('/customer/signup/send-otp', [CustomerAuthController::class, 'signupSendOtp']);
@@ -38,4 +36,19 @@ Route::post('/customer/forgot-password/resend-otp', [CustomerAuthController::cla
 Route::post('/customer/forgot-password/verify-otp', [CustomerAuthController::class, 'forgotPasswordVerifyOtp']);
 Route::post('/customer/forgot-password/reset-password', [CustomerAuthController::class, 'forgotPasswordReset']);
 
+// Customer Login
+Route::post('/customer/login', [CustomerAuthController::class, 'login']);
+Route::post('/customer/login/send-otp', [CustomerAuthController::class, 'loginSendOtp']);
+Route::post('/customer/login/resend-otp', [CustomerAuthController::class, 'loginResendOtp']);
+Route::post('/customer/login/verify-otp', [CustomerAuthController::class, 'loginVerifyOtp']);
 
+Route::middleware('auth:sanctum')->group(function () {
+
+    Route::get('/services', [ServiceController::class, 'index']);
+
+    // Vendor
+    Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
+
+    // Customer
+    Route::post('/customer/logout', [CustomerAuthController::class, 'logout']);
+});
