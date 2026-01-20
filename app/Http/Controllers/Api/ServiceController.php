@@ -14,7 +14,7 @@ class ServiceController extends Controller
             $services = Service::select('id', 'name', 'image')->get();
 
             return response()->json([
-                'status'  => 200,
+                'status'  => true,
                 'message' => 'Services fetched successfully',
                 'data'    => $services
             ], 200);
