@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\CustomerAuthController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\VendorAuthController;
 use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\Api\CustomerHomeController;
 
 
 // Vendor Signup
@@ -45,7 +46,8 @@ Route::post('/customer/login/verify-otp', [CustomerAuthController::class, 'login
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/services', [ServiceController::class, 'index']);
-
+    Route::get('/customer/home/vendors', [CustomerHomeController::class, 'vendors']);
+    
     // Vendor
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
 
