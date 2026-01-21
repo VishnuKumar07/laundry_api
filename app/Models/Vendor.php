@@ -34,6 +34,11 @@ class Vendor extends Model
         return $this->hasMany(VendorDocument::class);
     }
 
+    public function ratings()
+    {
+        return $this->hasMany(VendorRating::class);
+    }
+
     public function favoritedByCustomers()
     {
         return $this->belongsToMany(

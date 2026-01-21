@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\VendorAuthController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\CustomerHomeController;
 use App\Http\Controllers\Api\CustomerFavoriteController;
-
+use App\Http\Controllers\Api\CustomerVendorRatingController;
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -50,6 +50,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customer/home/vendors', [CustomerHomeController::class, 'vendors']);
     Route::post('/customer/favorites', [CustomerFavoriteController::class, 'store']);
     Route::delete('/customer/favorites', [CustomerFavoriteController::class, 'destroy']);
+    Route::post('/customer/vendor/addratings', [CustomerVendorRatingController::class, 'store']);
+    Route::post('/customer/vendor/rating/list', [CustomerVendorRatingController::class, 'ratingList']);
+
 
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
 

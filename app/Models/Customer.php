@@ -29,6 +29,11 @@ class Customer extends Model
         return $this->hasOne(CustomerAddress::class);
     }
 
+    public function vendorRatings()
+    {
+        return $this->hasMany(VendorRating::class);
+    }
+
     public function favoriteVendors()
     {
         return $this->belongsToMany(
