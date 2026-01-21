@@ -29,4 +29,13 @@ class Customer extends Model
         return $this->hasOne(CustomerAddress::class);
     }
 
+    public function favoriteVendors()
+    {
+        return $this->belongsToMany(
+            Vendor::class,
+            'customer_favorite_vendors'
+        )->withTimestamps();
+    }
+
+
 }

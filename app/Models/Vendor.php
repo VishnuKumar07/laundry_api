@@ -33,4 +33,13 @@ class Vendor extends Model
     {
         return $this->hasMany(VendorDocument::class);
     }
+
+    public function favoritedByCustomers()
+    {
+        return $this->belongsToMany(
+            Customer::class,
+            'customer_favorite_vendors'
+        )->withTimestamps();
+    }
+
 }
