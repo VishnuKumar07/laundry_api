@@ -6,19 +6,19 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class VendorRating extends Model
+class VendorWorkingHour extends Model
 {
     use HasFactory, SoftDeletes;
-    
+
     protected $fillable = [
         'vendor_id',
-        'customer_id',
-        'rating',
-        'review',
+        'day',
+        'is_open',
+        'open_time',
+        'close_time',
     ];
 
-    public function customer()
-    {
-        return $this->belongsTo(Customer::class);
-    }
+    protected $casts = [
+        'is_open' => 'boolean',
+    ];
 }

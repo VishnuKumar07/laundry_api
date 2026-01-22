@@ -28,6 +28,7 @@ class CustomerHomeController extends Controller
             $vendors = Vendor::with([
                     'user:id,first_name,last_name,role,primary_mobile,primary_email',
                     'address:id,vendor_id,door_no,street,landmark,pincode,city,state,country,address_type,company_image',
+                    'workingHours:id,vendor_id,day,is_open,open_time,close_time',
                 ])
                 ->select(
                     'id',
@@ -40,6 +41,39 @@ class CustomerHomeController extends Controller
                 )
                 ->get()
                 ->map(function ($vendor) use ($favoriteVendorIds) {
+
+                    $today = strtolower(Carbon::now()->format('l'));
+
+                    $todayHours = $vendor->workingHours->firstWhere('day', $today);
+
+                    $isOpenNow = null;
+                    $openStatus = 'Not Updated';
+
+                    if ($todayHours) {
+                        if (!$todayHours->is_open) {
+                            $isOpenNow = false;
+                            $openStatus = 'Closed';
+                        } elseif ($todayHours->open_time && $todayHours->close_time) {
+
+                            $now = Carbon::now();
+                            $openTime = Carbon::createFromTimeString($todayHours->open_time);
+                            $closeTime = Carbon::createFromTimeString($todayHours->close_time);
+
+                            if ($now->between($openTime, $closeTime)) {
+                                $isOpenNow = true;
+
+                                $minutesLeft = $now->diffInMinutes($closeTime, false);
+
+                                $openStatus = ($minutesLeft <= 30)
+                                    ? 'Closing Soon'
+                                    : 'Open';
+                            } else {
+                                $isOpenNow = false;
+                                $openStatus = 'Closed';
+                            }
+                        }
+                    }
+
 
                     $years = $vendor->date_of_incorporation? (int) Carbon::parse($vendor->date_of_incorporation)->diffInYears(now()) : 0;
 
@@ -60,6 +94,8 @@ class CustomerHomeController extends Controller
                         'country'       => $vendor->address->country ?? null,
                         'address_type'  => $vendor->address->address_type ?? null,
                         'is_favorite' => in_array($vendor->id, $favoriteVendorIds),
+                        'is_open_now' => $isOpenNow,
+                        'open_status' => $openStatus,
                         'company_images' => $vendor->address->company_image_urls ?? [],
 
                     ];

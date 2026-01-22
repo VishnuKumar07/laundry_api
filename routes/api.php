@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\CustomerHomeController;
 use App\Http\Controllers\Api\CustomerFavoriteController;
 use App\Http\Controllers\Api\CustomerVendorRatingController;
+use App\Http\Controllers\Api\VendorWorkingHourController;
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -47,14 +48,16 @@ Route::post('/customer/login/verify-otp', [CustomerAuthController::class, 'login
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/services', [ServiceController::class, 'index']);
+
     Route::get('/customer/home/vendors', [CustomerHomeController::class, 'vendors']);
     Route::post('/customer/favorites', [CustomerFavoriteController::class, 'store']);
     Route::delete('/customer/favorites', [CustomerFavoriteController::class, 'destroy']);
     Route::post('/customer/vendor/addratings', [CustomerVendorRatingController::class, 'store']);
     Route::post('/customer/vendor/rating/list', [CustomerVendorRatingController::class, 'ratingList']);
+    Route::post('/customer/logout', [CustomerAuthController::class, 'logout']);
 
-
+    Route::post('/vendor/add-update/working-hours',[VendorWorkingHourController::class, 'store']);
+    Route::get('/vendor/get/working-hours',[VendorWorkingHourController::class, 'index']);
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
 
-    Route::post('/customer/logout', [CustomerAuthController::class, 'logout']);
 });

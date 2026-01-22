@@ -39,6 +39,11 @@ class Vendor extends Model
         return $this->hasMany(VendorRating::class);
     }
 
+    public function workingHours()
+    {
+        return $this->hasMany(VendorWorkingHour::class);
+    }
+
     public function favoritedByCustomers()
     {
         return $this->belongsToMany(
