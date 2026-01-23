@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\CustomerHomeController;
 use App\Http\Controllers\Api\CustomerFavoriteController;
 use App\Http\Controllers\Api\CustomerVendorRatingController;
 use App\Http\Controllers\Api\VendorWorkingHourController;
+use App\Http\Controllers\Api\DeliveryTypeController;
+use App\Http\Controllers\Api\VendorServiceTypeController;
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -56,6 +58,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/customer/vendor/rating/list', [CustomerVendorRatingController::class, 'ratingList']);
     Route::post('/customer/logout', [CustomerAuthController::class, 'logout']);
 
+    Route::post('/vendor/service-type', [VendorServiceTypeController::class, 'storeOrUpdate']);
+    Route::get('/vendor/service-type',[VendorServiceTypeController::class, 'index']);
+    Route::get('/vendor/delivery-type/list',[DeliveryTypeController::class, 'getDeliveryTypeList']);
     Route::post('/vendor/add-update/working-hours',[VendorWorkingHourController::class, 'store']);
     Route::get('/vendor/get/working-hours',[VendorWorkingHourController::class, 'index']);
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);

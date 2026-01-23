@@ -22,5 +22,11 @@ class Service extends Model
             ? asset('services/' . $this->image)
             : null;
     }
+
+    public function vendorServices()
+    {
+        return $this->hasMany(VendorService::class);
+    }
+
 }
 
