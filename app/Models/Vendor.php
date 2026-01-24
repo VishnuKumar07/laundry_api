@@ -46,7 +46,7 @@ class Vendor extends Model
 
     public function services()
     {
-        return $this->hasMany(VendorService::class);
+        return $this->hasMany(VendorServiceType::class);
     }
 
 

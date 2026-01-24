@@ -23,16 +23,28 @@ class VendorAddress extends Model
 
     public function getCompanyImageUrlsAttribute()
     {
-        if (empty($this->company_image)) {
+
+        $imagesData = $this->company_image;
+
+        if (is_string($imagesData)) {
+            $decoded = json_decode($imagesData, true);
+            $imagesData = is_array($decoded) ? $decoded : [];
+        }
+
+        if (!is_array($imagesData) || empty($imagesData)) {
             return [];
         }
+
         $images = [];
-        foreach ($this->company_image as $image) {
+
+        foreach ($imagesData as $image) {
             if (!$image) {
                 continue;
             }
+
             $image = str_replace('\\', '/', $image);
             $image = str_ireplace('uploads/Vendor/', 'uploads/vendor/', $image);
+
             if (str_starts_with($image, 'uploads/')) {
                 $images[] = asset($image);
             } else {
@@ -42,6 +54,7 @@ class VendorAddress extends Model
 
         return $images;
     }
+
 
 
 

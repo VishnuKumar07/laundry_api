@@ -56,7 +56,8 @@ class CustomerFavoriteController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal Server Error',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -106,7 +107,8 @@ class CustomerFavoriteController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal Server Error',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

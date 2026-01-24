@@ -24,7 +24,8 @@ class DeliveryTypeController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Something went wrong'
+                'message' => 'Internal Server Error',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

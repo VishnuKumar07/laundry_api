@@ -110,7 +110,8 @@ class CustomerHomeController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Internal server error'
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

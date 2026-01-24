@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Validator;
 
 class VendorWorkingHourController extends Controller
 {
- 
+
     public function index(Request $request)
     {
         try {
@@ -59,10 +59,11 @@ class VendorWorkingHourController extends Controller
                 'data'   => $data
             ], 200);
 
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal Server Error',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -96,7 +97,6 @@ class VendorWorkingHourController extends Controller
 
             foreach ($request->days as $dayData) {
 
-                // Extra safety: close time must be after open time
                 if (
                     $dayData['is_open'] &&
                     strtotime($dayData['close_time']) <= strtotime($dayData['open_time'])
@@ -125,10 +125,11 @@ class VendorWorkingHourController extends Controller
                 'message' => 'Working hours updated successfully'
             ], 200);
 
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Internal server error'
+                'message' => 'Internal Server Error',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
