@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\DeliveryTypeController;
 use App\Http\Controllers\Api\VendorServiceTypeController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CustomerFilterController;
+use App\Http\Controllers\Api\ProductController;
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -67,6 +68,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vendor/delivery-type/list',[DeliveryTypeController::class, 'getDeliveryTypeList']);
     Route::post('/vendor/add-update/working-hours',[VendorWorkingHourController::class, 'store']);
     Route::get('/vendor/get/working-hours',[VendorWorkingHourController::class, 'index']);
+
+    Route::post('/vendor/add-product', [ProductController::class, 'addProduct']);
+
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
 
 });
