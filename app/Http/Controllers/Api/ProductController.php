@@ -97,4 +97,87 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function vendorProducts(Request $request)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'vendor_id'         => 'required|exists:vendors,id',
+                'category_id'       => 'required|exists:categories,id',
+                'delivery_type_id'  => 'required|exists:delivery_types,id',
+                'service_id'        => 'required|exists:services,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => $validator->errors()->first(),
+                ], 422);
+            }
+
+            $products = VendorProduct::with([
+                    'prices' => function ($q) use ($request) {
+                        $q->where('delivery_type_id', $request->delivery_type_id)
+                        ->where('service_id', $request->service_id)
+                        ->with([
+                            'service:id,name',
+                            'deliveryType:id,name'
+                        ]);
+                    }
+                ])
+                ->where('vendor_id', $request->vendor_id)
+                ->where('category_id', $request->category_id)
+                ->where('status', 'active')
+                ->whereHas('prices', function ($q) use ($request) {
+                    $q->where('delivery_type_id', $request->delivery_type_id)
+                    ->where('service_id', $request->service_id);
+                })
+                ->get()
+                ->map(function ($product) {
+
+                    return [
+                        'product_id'   => $product->id,
+                        'product_name' => $product->name,
+
+                        'prices' => $product->prices->map(function ($price) {
+
+                            return [
+                                'service_id'         => $price->service_id,
+                                'service_name'       => $price->service->name ?? null,
+
+                                'delivery_type_id'   => $price->delivery_type_id,
+                                'delivery_type_name' => $price->deliveryType->name ?? null,
+
+                                'mrp'                => $price->mrp,
+                                'discount_price'     => $price->discount_price,
+                                'final_price'        => $price->discount_price ?? $price->mrp,
+                            ];
+                        })->values()
+                    ];
+                });
+
+            if ($products->isEmpty()) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'No products found for selected service and delivery type',
+                    'data'    => []
+                ], 404);
+            }
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Vendor products fetched successfully',
+                'data'    => $products
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Internal Server Error',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }

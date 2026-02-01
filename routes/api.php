@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\VendorServiceTypeController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CustomerFilterController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\VendorTermsConditionController;
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -62,14 +63,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/customer/vendor/rating/list', [CustomerVendorRatingController::class, 'ratingList']);
     Route::post('/customer/logout', [CustomerAuthController::class, 'logout']);
     Route::post('/customer/service-type/filters', [CustomerFilterController::class, 'serviceTypeFilters']);
+    Route::post('/customer/vendor-products', [ProductController::class, 'vendorProducts']);
+    Route::post('/customer/vendor-terms-conditions', [VendorTermsConditionController::class, 'getVendorTermsForCustomer']);
+
 
     Route::post('/vendor/service-type', [VendorServiceTypeController::class, 'storeOrUpdate']);
     Route::get('/vendor/service-type',[VendorServiceTypeController::class, 'index']);
     Route::get('/vendor/delivery-type/list',[DeliveryTypeController::class, 'getDeliveryTypeList']);
     Route::post('/vendor/add-update/working-hours',[VendorWorkingHourController::class, 'store']);
     Route::get('/vendor/get/working-hours',[VendorWorkingHourController::class, 'index']);
-
     Route::post('/vendor/add-product', [ProductController::class, 'addProduct']);
+    Route::post('/vendor/terms-conditions', [VendorTermsConditionController::class, 'storeOrUpdate']);
+    Route::post('/vendor/get-terms-conditions', [VendorTermsConditionController::class, 'getTermsConditions']);
 
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
 

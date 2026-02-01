@@ -16,6 +16,16 @@ class VendorProductPrice extends Model
 
     public function product()
     {
-        return $this->belongsTo(VendorProduct::class);
+        return $this->belongsTo(VendorProduct::class, 'vendor_product_id');
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(Service::class, 'service_id');
+    }
+
+    public function deliveryType()
+    {
+        return $this->belongsTo(DeliveryType::class, 'delivery_type_id');
     }
 }
