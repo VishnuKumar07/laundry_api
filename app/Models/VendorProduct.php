@@ -19,6 +19,13 @@ class VendorProduct extends Model
         return $this->hasMany(VendorProductPrice::class);
     }
 
+    public function getImageUrlAttribute()
+    {
+        if (!$this->image) {
+            return null;
+        }
 
+        return asset('uploads/vendor/products/' . $this->image);
+    }
 
 }
