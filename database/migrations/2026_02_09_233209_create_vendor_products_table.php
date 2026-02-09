@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('name');
 
             $table->text('description')->nullable();
-            $table->string('image')->nullable();
+            $table->json('images')->nullable();
             $table->boolean('coupon_available')->default(false);
             $table->date('effective_date')->nullable();
             $table->integer('position')->default(0);

@@ -29,9 +29,7 @@ class ProductController extends Controller
                     ], 422);
                 }
 
-                $request->merge([
-                    'prices' => $decodedPrices
-                ]);
+                $request->merge(['prices' => $decodedPrices]);
             }
 
             $validator = Validator::make($request->all(), [
@@ -43,7 +41,8 @@ class ProductController extends Controller
                 'effective_date'            => 'nullable|date',
                 'position'                  => 'nullable|integer|min:0',
 
-                'image'                     => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+                'images'                    => 'nullable|array',
+                'images.*'                  => 'image|mimes:jpg,jpeg,png,webp|max:2048',
 
                 'prices'                    => 'required|array|min:1',
                 'prices.*.service_id'       => 'required|exists:services,id',
@@ -81,10 +80,10 @@ class ProductController extends Controller
             }
 
             if ($request->filled('position') && (int)$request->position > 0) {
-
                 $positionExists = VendorProduct::where('vendor_id', $vendor->id)
                     ->where('category_id', $request->category_id)
-                    ->where('position', $request->position)->exists();
+                    ->where('position', $request->position)
+                    ->exists();
 
                 if ($positionExists) {
                     return response()->json([
@@ -94,28 +93,26 @@ class ProductController extends Controller
                 }
             }
 
-            $imageName = null;
+            $imageNames = [];
 
-            if ($request->hasFile('image')) {
-                $imageName = time() . '_' . uniqid() . '.' .
-                            $request->image->getClientOriginalExtension();
-
-                $request->image->move(
-                    public_path('uploads/vendor/products'),
-                    $imageName
-                );
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $image) {
+                    $name = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+                    $image->move(public_path('uploads/vendor/products'), $name);
+                    $imageNames[] = $name;
+                }
             }
 
             $product = VendorProduct::create([
-                'vendor_id'   => $vendor->id,
-                'category_id' => $request->category_id,
-                'name'             => $request->name,
-                'description'      => $request->description,
-                'image'            => $imageName,
-                'coupon_available' => $request->coupon_available ?? false,
-                'effective_date'   => $request->effective_date,
-                'position'         => $request->position ?? 0,
-                'status'           => 'active',
+                'vendor_id'         => $vendor->id,
+                'category_id'       => $request->category_id,
+                'name'              => $request->name,
+                'description'       => $request->description,
+                'images'            => $imageNames,
+                'coupon_available'  => $request->coupon_available ?? false,
+                'effective_date'    => $request->effective_date,
+                'position'          => $request->position ?? 0,
+                'status'            => 'active',
             ]);
 
             foreach ($request->prices as $price) {
@@ -123,7 +120,6 @@ class ProductController extends Controller
                     'vendor_product_id' => $product->id,
                     'service_id'        => $price['service_id'],
                     'delivery_type_id'  => $price['delivery_type_id'],
-
                     'mrp'               => $price['mrp'],
                     'selling_price'     => $price['selling_price'],
                     'cgst'              => $price['cgst'] ?? 0,
@@ -139,7 +135,7 @@ class ProductController extends Controller
                 'data'    => [
                     'product_id' => $product->id,
                     'name'       => $product->name,
-                    'image_url'  => $product->image_url,
+                    'images'     => $product->image_urls,
                 ]
             ], 201);
 
@@ -153,6 +149,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
 
     public function vendorProducts(Request $request)
     {

@@ -10,22 +10,28 @@ class VendorProduct extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'vendor_products';
-
     protected $guarded = ['id'];
+
+    protected $casts = [
+        'images' => 'array',
+    ];
+
+    protected $appends = ['image_urls'];
+
+    public function getImageUrlsAttribute()
+    {
+        if (empty($this->images)) {
+            return [];
+        }
+
+        return collect($this->images)->map(function ($img) {
+            return asset('uploads/vendor/products/' . $img);
+        })->toArray();
+    }
 
     public function prices()
     {
         return $this->hasMany(VendorProductPrice::class);
     }
-
-    public function getImageUrlAttribute()
-    {
-        if (!$this->image) {
-            return null;
-        }
-
-        return asset('uploads/vendor/products/' . $this->image);
-    }
-
 }
+
