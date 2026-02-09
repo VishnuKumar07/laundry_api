@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\CustomerFilterController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\VendorTermsConditionController;
 use App\Http\Controllers\Api\VendorSettingController;
+use App\Http\Controllers\Api\MyProfileController;
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -78,6 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/vendor/get-terms-conditions', [VendorTermsConditionController::class, 'getTermsConditions']);
     Route::post('/vendor/settings', [VendorSettingController::class, 'storeOrUpdate']);
     Route::get('/vendor/settings', [VendorSettingController::class, 'get']);
+    Route::get('/vendor/my-profile', [MyProfileController::class, 'getMyProfile']);
 
 
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
