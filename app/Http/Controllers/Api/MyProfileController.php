@@ -42,11 +42,11 @@ class MyProfileController extends Controller
                     'secondary_email'        => $vendor->user->secondary_email ?? null,
 
                     'date_of_birth'          => $vendor->date_of_birth
-                        ? Carbon::parse($vendor->date_of_birth)->format('d M, Y')
+                        ? Carbon::parse($vendor->date_of_birth)->format('d-m-Y')
                         : null,
 
                     'date_of_incorporation'  => $vendor->date_of_incorporation
-                        ? Carbon::parse($vendor->date_of_incorporation)->format('d M, Y')
+                        ? Carbon::parse($vendor->date_of_incorporation)->format('d-m-Y')
                         : null,
                 ]
             ], 200);
