@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\VendorTermsConditionController;
 use App\Http\Controllers\Api\VendorSettingController;
 use App\Http\Controllers\Api\MyProfileController;
+use App\Http\Controllers\Api\CouponController;
 
 // Vendor Signup
 Route::post('/vendor/signup', [VendorAuthController::class, 'signup']);
@@ -68,7 +69,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/customer/vendor-products', [ProductController::class, 'vendorProducts']);
     Route::post('/customer/vendor-terms-conditions', [VendorTermsConditionController::class, 'getVendorTermsForCustomer']);
 
-
     Route::post('/vendor/service-type', [VendorServiceTypeController::class, 'storeOrUpdate']);
     Route::get('/vendor/service-type',[VendorServiceTypeController::class, 'index']);
     Route::get('/vendor/delivery-type/list',[DeliveryTypeController::class, 'getDeliveryTypeList']);
@@ -80,7 +80,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/vendor/settings', [VendorSettingController::class, 'storeOrUpdate']);
     Route::get('/vendor/settings', [VendorSettingController::class, 'get']);
     Route::get('/vendor/my-profile', [MyProfileController::class, 'getMyProfile']);
-
+    Route::post('/vendor/coupons', [CouponController::class, 'store']);
+    Route::get('/vendor/coupons', [CouponController::class, 'index']);
 
     Route::post('/vendor/logout', [VendorAuthController::class, 'logout']);
 
